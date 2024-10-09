@@ -107,8 +107,8 @@ truck3 = Truck(16, 18, None, [2, 4, 5, 6, 7, 8, 9, 10, 11, 25, 28, 32, 33], 0.0,
 package_hash = HashTable()
 load_package_data('CSVPackages.csv', package_hash)
 
-# Method for ordering packages on a given truck using the nearest neighbor algo
-# This method also calculates the distance a given truck drives once the packages are sorted
+# Method for ordering packages on a given truck using the nearest neighbor algorithm
+# Also calculates distance a given truck drives once the packages are sorted
 # Time complexity is O(n^2)
 def package_delivery_start(truck):
     # Create a list to hold packages that have not yet been delivered
