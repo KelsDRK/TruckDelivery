@@ -1,0 +1,215 @@
+import csv
+import datetime
+
+from HashTable import HashTable
+from Package import Package
+from Truck import Truck
+
+# --------- ONE TIME TABLE INSTANCE -----------
+myHash = HashTable()
+
+# Read the file of distance information
+with open("CSVDistances.csv") as csvfile:
+    CSV_Distance = csv.reader(csvfile)
+    CSV_Distance = list(CSV_Distance)
+
+# Read the file of address information
+with open("CSVAddresses.csv") as csvfile1:
+    CSV_Address = csv.reader(csvfile1)
+    CSV_Address = list(CSV_Address)
+
+# Read the file of package information
+with open("CSVPackages.csv") as csvfile2:
+    CSV_Package = csv.reader(csvfile2)
+    CSV_Package = list(CSV_Package)
+
+
+def loadPackageData(fileName):
+    with open(fileName) as packages:
+        packageData = csv.reader(packages, delimiter=',')
+        next(packageData)  # skip header ---> check to see if this is skipping first package
+        packageList = list()
+        for package in packageData:
+            packageID = int(package[0])
+            address = package[1]
+            deadline = package[2]
+            city = package[3]
+            zip = package[1]
+            weight = package[2]
+            status = package[3]
+
+            # package object
+            p = Package(packageID, address, deadline, city, zip, weight, status)
+
+
+            packageList.append(p)
+
+            # insert it into the hash table
+            myHash.add(packageID, p)
+
+# Load movies to Hash Table
+loadPackageData('CSVPackages.csv')
+
+def loadDistanceData():
+    with open('CSVDistances.csv') as distances:
+        # Create a reader object which will iterate over lines in the 'distances.csv' file
+        csv_reader = csv.reader(distances, delimiter=',')
+
+        distanceDataList = list()
+        for row in csv_reader:
+            distanceDataList.append(row)
+
+    return distanceDataList
+loadDistanceData()
+
+def loadAddressData():
+    with open('CSVAddresses.csv') as address:
+        csv_reader = csv.reader(address, delimiter=',')
+
+        addressDataList = list()
+
+        for row in csv_reader:
+            full_address = row[0].split("\n")
+            street_address = full_address[0].strip()
+            addressDataList.append(street_address)
+
+    #print(addressDataList)
+    return addressDataList
+loadAddressData()
+
+# Method to get address number from string literal of address
+def extract_address(address):
+    for row in CSV_Address:
+        if address in row[2]:
+            return int(row[0])
+
+
+def distance_between(x, y):
+    try:
+        distance = CSV_Distance[x][y]
+
+        # Check if distance is valid
+        if distance is None or distance == '':
+            return float('inf')  # or handle as appropriate
+
+        return float(distance)
+
+    except (IndexError, KeyError) as e:
+        # Handle invalid indices or keys gracefully
+        print(f"Invalid indices or keys: {x}, {y}. Error: {e}")
+        return float('inf')  # or raise an exception based on your needs
+
+# Create truck object truck1
+truck1 = Truck(16, 18, None, [1, 13, 14, 15, 16, 20, 29, 30, 31, 34, 37, 40], 0.0, "4001 South 700 East",
+                     datetime.time(hour=8))
+
+# Create truck object truck2
+truck2 = Truck(16, 18, None, [3, 6, 12, 17, 18, 19, 21, 22, 23, 24, 26, 27, 35, 36, 38, 39], 0.0,
+                     "4001 South 700 East", datetime.time(hour=10, minute=20))
+
+# Create truck object truck3
+truck3 = Truck(16, 18, None, [2, 4, 5, 6, 7, 8, 9, 10, 11, 25, 28, 32, 33], 0.0, "4001 South 700 East",
+                     datetime.time(hour=9, minute=5))
+
+# Method for ordering packages on a given truck using the nearest neighbor algo
+# This method also calculates the distance a given truck drives once the packages are sorted
+def package_delivery_start(truck):
+    # Retrieve packages and filter out any None values
+    no_delivery = [myHash.get(packageID) for packageID in truck.packages]
+    no_delivery = [package for package in no_delivery if package is not None]
+
+    truck.packages.clear()
+
+    while no_delivery:
+        next_address = float('inf')
+        next_package = None
+
+        for package in no_delivery:
+            truck_address = extract_address(truck.address)
+            package_address = extract_address(package.address)
+            distance = distance_between(truck_address, package_address)
+
+            if distance < next_address:
+                next_address = distance
+                next_package = package
+
+        if next_package:
+            truck.packages.append(next_package.ID)
+            no_delivery.remove(next_package)
+            truck.mileage += next_address
+            truck.address = next_package.address
+            truck.time += datetime.timedelta(hours=next_address / 18)
+            next_package.delivery_time = truck.time
+            next_package.departure_time = truck.depart_time
+        else:
+            print("No valid package found, check the no_delivery list.")
+            break
+
+
+# Put the trucks through the loading process
+package_delivery_start(truck1)
+package_delivery_start(truck2)
+# The below line of code ensures that truck 3 does not leave until either of the first two trucks are finished
+# delivering their packages
+truck3.depart_time = min(truck1.time, truck2.time)
+package_delivery_start(truck3)
+
+class ParcelService:
+    def __init__(self):
+        print("Welcome to the Western Governors University Parcel Service (WGUPS)")
+        self.display_total_mileage()
+        self.initiate_process()
+
+    def display_total_mileage(self):
+        total_mileage = truck1.mileage + truck2.mileage + truck3.mileage
+        print("Total mileage for the route:", total_mileage)
+
+    def initiate_process(self):
+        user_input = input("Type 'time' to begin (any other input will exit the program): ")
+        if user_input.lower() == "time":
+            self.check_package_status()
+        else:
+            print("Invalid input. The program will now exit.")
+            exit()
+
+    def check_package_status(self):
+        try:
+            user_time = input("Enter a time to check package status (format: HH:MM:SS): ")
+            hours, minutes, seconds = map(int, user_time.split(":"))
+            time_delta = datetime.timedelta(hours=hours, minutes=minutes, seconds=seconds)
+
+            choice = input("Type 'solo' to view a specific package or 'all' for all packages: ")
+
+            if choice.lower() == "solo":
+                self.view_single_package(time_delta)
+            elif choice.lower() == "all":
+                self.view_all_packages(time_delta)
+            else:
+                print("Invalid choice. The program will now exit.")
+                exit()
+        except ValueError:
+            print("Invalid entry. The program will now exit.")
+            exit()
+
+    def view_single_package(self, time_delta):
+        try:
+            package_id = input("Please enter the numeric package ID: ")
+            package = myHash.get(package_id)
+            package.update_status(time_delta)
+            print(str(package))
+        except ValueError:
+            print("Invalid entry. The program will now exit.")
+            exit()
+
+    def view_all_packages(self, time_delta):
+        try:
+            for package_id in range(1, 41):
+                package = myHash.get(package_id)
+                print(str(package))
+        except ValueError:
+            print("Invalid entry. The program will now exit.")
+            exit()
+
+# To execute the program, instantiate the ParcelService class
+if __name__ == "__main__":
+    ParcelService()
